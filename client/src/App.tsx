@@ -11,7 +11,8 @@ const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
 // ============================================================
 // קבועים
 // ============================================================
-const TABS = ["🏠 מרכז פיקוד","📋 פרויקטים","✅ משימות","🤖 כלי AI","💡 פרומפטים","🔍 מחקר שוק","📚 ידע ולקחים","💭 רעיונות","🧠 סוכן AI"];
+const TABS = ["🏠 מרכז פיקוד","📋 פרויקטים","✅ משימות","📄 מסמכים","🤖 כלי AI","💡 פרומפטים","🔍 מחקר שוק","📚 ידע ולקחים","💭 רעיונות","🧠 סוכן AI"];
+const DOC_TYPES = ["תיעוד","מדריך","סיכום","מחקר","תבנית","אחר"];
 const STAGES = ["רעיון","תכנון","פיתוח","בדיקות","השקה","צמיחה","הושלם","מושהה"];
 const TYPES = ["רווח","אישי/משפחתי"];
 const STAGE_COL = { "רעיון":"#6366f1","תכנון":"#8b5cf6","פיתוח":"#f59e0b","בדיקות":"#ef4444","השקה":"#10b981","צמיחה":"#06b6d4","הושלם":"#22c55e","מושהה":"#6b7280" };
@@ -76,9 +77,11 @@ export default function App() {
   const [knowledge, setKnowledge] = useState([]);
   const [ideas, setIdeas] = useState([]);
   const [tools, setTools] = useState([]);
+  const [docs, setDocs] = useState([]);
   const [msgs, setMsgs] = useState([{ role:"assistant", content:"שלום! אני הסוכן שלך 🚀\nכל הנתונים מסונכרנים לענן — גישה מכל מכשיר.\nמה נעשה היום?" }]);
   const [loading, setLoading] = useState(true);
   const [syncStatus, setSyncStatus] = useState("מסונכרן ✓");
+  const [realtimeConnected, setRealtimeConnected] = useState(false);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
   const [marketIdea, setMarketIdea] = useState("");
@@ -104,6 +107,11 @@ export default function App() {
   const [f_know, setF_know] = useState({ type:"לקח", title:"", content:"", project:"כללי", tags:"" });
   const [f_idea, setF_idea] = useState({ title:"", description:"", potential:"גבוה", tags:"" });
   const [f_tool, setF_tool] = useState({ name:"", category:"פיתוח וקוד", logo:"🔧", description:"", use_cases:"", strengths:"", weaknesses:"", pricing:"", url:"", my_rating:7, status:"פעיל", tags:"" });
+  const [m_doc, setM_doc] = useState(false);
+  const [f_doc, setF_doc] = useState({ title:"", type:"תיעוד", content:"", project:"כללי" });
+  const [docFilterProject, setDocFilterProject] = useState("הכל");
+  const [docFilterType, setDocFilterType] = useState("הכל");
+  const [expandedDoc, setExpandedDoc] = useState(null);
   const chatEnd = useRef(null);
 
   // ============================================================
@@ -111,6 +119,28 @@ export default function App() {
   // ============================================================
   useEffect(() => {
     loadAll();
+
+    const channel = sb.channel("realtime-sync")
+      .on("postgres_changes", { event:"*", schema:"public", table:"agent_tasks" }, (payload) => {
+        if (payload.eventType === "INSERT") setTasks(prev => [...prev.filter(t => t.id !== payload.new.id), payload.new]);
+        else if (payload.eventType === "UPDATE") setTasks(prev => prev.map(t => t.id === payload.new.id ? payload.new : t));
+        else if (payload.eventType === "DELETE") setTasks(prev => prev.filter(t => t.id !== payload.old.id));
+      })
+      .on("postgres_changes", { event:"*", schema:"public", table:"agent_projects" }, (payload) => {
+        if (payload.eventType === "INSERT") setProjects(prev => [...prev.filter(p => p.id !== payload.new.id), payload.new]);
+        else if (payload.eventType === "UPDATE") setProjects(prev => prev.map(p => p.id === payload.new.id ? payload.new : p));
+        else if (payload.eventType === "DELETE") setProjects(prev => prev.filter(p => p.id !== payload.old.id));
+      })
+      .on("postgres_changes", { event:"*", schema:"public", table:"agent_docs" }, (payload) => {
+        if (payload.eventType === "INSERT") setDocs(prev => [...prev.filter(d => d.id !== payload.new.id), payload.new]);
+        else if (payload.eventType === "UPDATE") setDocs(prev => prev.map(d => d.id === payload.new.id ? payload.new : d));
+        else if (payload.eventType === "DELETE") setDocs(prev => prev.filter(d => d.id !== payload.old.id));
+      })
+      .subscribe((status) => {
+        setRealtimeConnected(status === "SUBSCRIBED");
+      });
+
+    return () => { sb.removeChannel(channel); };
   }, []);
 
   useEffect(() => { chatEnd.current?.scrollIntoView({ behavior:"smooth" }); }, [msgs]);
@@ -118,7 +148,7 @@ export default function App() {
   const loadAll = async () => {
     setLoading(true);
     try {
-      const [p, t, pr, k, i, to, m] = await Promise.all([
+      const [p, t, pr, k, i, to, m, d] = await Promise.all([
         sb.from("agent_projects").select("*"),
         sb.from("agent_tasks").select("*"),
         sb.from("agent_prompts").select("*"),
@@ -126,6 +156,7 @@ export default function App() {
         sb.from("agent_ideas").select("*"),
         sb.from("agent_tools").select("*"),
         sb.from("agent_messages").select("*").order("created_at", { ascending:true }).limit(60),
+        sb.from("agent_docs").select("*"),
       ]);
 
       // אם הטבלה ריקה — טען נתוני ברירת מחדל
@@ -148,6 +179,8 @@ export default function App() {
       else if (!to.error) { await seedTable("agent_tools", DEF_TOOLS); setTools(DEF_TOOLS); }
 
       if (!m.error && m.data?.length > 0) setMsgs(m.data.map(x => ({ role:x.role, content:x.content })));
+
+      if (!d.error && d.data) setDocs(d.data);
 
       setSyncStatus("מסונכרן ✓");
     } catch(e) {
@@ -238,6 +271,14 @@ export default function App() {
     setF_tool({ name:"", category:"פיתוח וקוד", logo:"🔧", description:"", use_cases:"", strengths:"", weaknesses:"", pricing:"", url:"", my_rating:7, status:"פעיל", tags:"" }); setM_tool(false);
   };
 
+  const addDoc = async () => {
+    setSyncing();
+    const doc = { id:Date.now(), title:f_doc.title, type:f_doc.type, content:f_doc.content, project:f_doc.project, created_at:new Date().toISOString().split("T")[0] };
+    await sb.from("agent_docs").insert(doc);
+    setDocs(prev => [...prev, doc]); setDone();
+    setF_doc({ title:"", type:"תיעוד", content:"", project:"כללי" }); setM_doc(false);
+  };
+
   const del = async (table, id, setter, arr) => {
     setSyncing();
     await sb.from(table).delete().eq("id", id);
@@ -314,6 +355,8 @@ export default function App() {
   const activeProjTasks = tasks.filter(t => t.project_id === activeProject);
   const filteredPrompts = prompts.filter(p => (promptCat==="כל הקטגוריות"||p.category===promptCat) && (promptSearch===""||p.title?.includes(promptSearch)||p.prompt?.includes(promptSearch)));
   const filteredTools = tools.filter(t => toolCat==="הכל"||t.category===toolCat);
+  const filteredDocs = docs.filter(d => (docFilterProject==="הכל"||d.project===docFilterProject) && (docFilterType==="הכל"||d.type===docFilterType));
+  const docProjects = ["הכל", ...new Set(docs.map(d => d.project).filter(Boolean))];
   const stats = { projects:projects.length, active:projects.filter(p=>!["הושלם","מושהה"].includes(p.stage)).length, openTasks:tasks.filter(t=>t.col!=="הושלם").length, tools:tools.length };
 
   // ============================================================
@@ -372,6 +415,12 @@ export default function App() {
             <div style={{ display:"flex", alignItems:"center", gap:6 }}>
               <div style={{ width:6, height:6, borderRadius:"50%", background: syncStatus.includes("✓") ? "#22c55e" : syncStatus.includes("שומר") ? "#f59e0b" : "#ef4444" }} />
               <p style={{ fontSize:"10px", color:"#374151" }}>{syncStatus} — ענן Supabase</p>
+              {realtimeConnected && (
+                <span data-testid="live-indicator" style={{ display:"inline-flex", alignItems:"center", gap:3, background:"#052e16", border:"1px solid #166534", padding:"1px 7px", borderRadius:10, fontSize:"9px", color:"#4ade80", fontWeight:700, marginRight:4 }}>
+                  <span style={{ width:5, height:5, borderRadius:"50%", background:"#4ade80", animation:"pulse 2s infinite" }} />
+                  LIVE
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -539,6 +588,52 @@ export default function App() {
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* ========== מסמכים ========== */}
+        {tab === "📄 מסמכים" && (
+          <div>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14, gap:8, flexWrap:"wrap" }}>
+              <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+                <select className="sel" data-testid="select-doc-project-filter" value={docFilterProject} onChange={e => setDocFilterProject(e.target.value)}>
+                  {docProjects.map(p => <option key={p} value={p}>{p === "הכל" ? "כל הפרויקטים" : p}</option>)}
+                </select>
+                <select className="sel" data-testid="select-doc-type-filter" value={docFilterType} onChange={e => setDocFilterType(e.target.value)}>
+                  <option value="הכל">כל הסוגים</option>
+                  {DOC_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+                <span style={{ fontSize:"12px", color:"#475569" }}>{filteredDocs.length} מסמכים</span>
+              </div>
+              <button className="btn btn-p" data-testid="button-add-doc" onClick={() => setM_doc(true)}>+ מסמך חדש</button>
+            </div>
+            {filteredDocs.length === 0 && (
+              <div className="card" style={{ textAlign:"center", padding:30 }}>
+                <div style={{ fontSize:"14px", color:"#475569" }}>אין מסמכים עדיין. לחץ "+ מסמך חדש" להתחיל.</div>
+              </div>
+            )}
+            {filteredDocs.map(doc => (
+              <div key={doc.id} className="card" data-testid={`card-doc-${doc.id}`} style={{ marginBottom:10, cursor:"pointer" }} onClick={() => setExpandedDoc(expandedDoc === doc.id ? null : doc.id)}>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
+                  <div style={{ flex:1 }}>
+                    <div style={{ display:"flex", gap:8, alignItems:"center", marginBottom:6 }}>
+                      <span style={{ fontSize:"11px", background:"#1a1a3e", color:"#a78bfa", padding:"2px 8px", borderRadius:4 }}>{doc.type}</span>
+                      <h3 style={{ fontSize:"14px", fontWeight:700 }}>{doc.title}</h3>
+                    </div>
+                    <div style={{ display:"flex", gap:8, alignItems:"center", marginBottom:6 }}>
+                      <span style={{ fontSize:"11px", background:"#1e293b", padding:"2px 8px", borderRadius:4, color:"#475569" }}>פרויקט: {doc.project}</span>
+                      <span style={{ fontSize:"11px", color:"#374151" }}>{doc.created_at}</span>
+                    </div>
+                    {expandedDoc === doc.id ? (
+                      <div style={{ fontSize:"13px", color:"#94a3b8", lineHeight:1.7, whiteSpace:"pre-wrap", background:"#0a1020", padding:12, borderRadius:8, border:"1px solid #1e293b", marginTop:8 }}>{doc.content}</div>
+                    ) : (
+                      <p style={{ fontSize:"12px", color:"#64748b", lineHeight:1.5 }}>{doc.content?.substring(0, 150)}{doc.content?.length > 150 ? "..." : ""}</p>
+                    )}
+                  </div>
+                  <button className="btn btn-d" data-testid={`button-delete-doc-${doc.id}`} style={{ marginRight:12, flexShrink:0 }} onClick={e => { e.stopPropagation(); del("agent_docs", doc.id, setDocs, docs); }}>מחק</button>
+                </div>
+              </div>
+            ))}
           </div>
         )}
 
@@ -851,6 +946,22 @@ export default function App() {
           <div style={{ display:"flex", gap:8, justifyContent:"flex-end" }}>
             <button className="btn btn-s" onClick={()=>setM_tool(false)}>ביטול</button>
             <button className="btn btn-p" onClick={addTool}>הוסף</button>
+          </div>
+        </div>
+      </div></div>}
+
+      {m_doc && <div className="ov" onClick={()=>setM_doc(false)}><div className="modal" onClick={e=>e.stopPropagation()}>
+        <h3 style={{ marginBottom:14, color:"#a5b4fc" }}>מסמך חדש</h3>
+        <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+          <input className="inp" data-testid="input-doc-title" placeholder="כותרת המסמך" value={f_doc.title} onChange={e=>setF_doc({...f_doc,title:e.target.value})} />
+          <select className="sel" data-testid="select-doc-type" value={f_doc.type} onChange={e=>setF_doc({...f_doc,type:e.target.value})}>
+            {DOC_TYPES.map(t=><option key={t} value={t}>{t}</option>)}
+          </select>
+          <input className="inp" data-testid="input-doc-project" placeholder="פרויקט קשור" value={f_doc.project} onChange={e=>setF_doc({...f_doc,project:e.target.value})} />
+          <textarea className="inp" data-testid="input-doc-content" style={{ minHeight:150 }} placeholder="תוכן המסמך..." value={f_doc.content} onChange={e=>setF_doc({...f_doc,content:e.target.value})} />
+          <div style={{ display:"flex", gap:8, justifyContent:"flex-end" }}>
+            <button className="btn btn-s" onClick={()=>setM_doc(false)}>ביטול</button>
+            <button className="btn btn-p" data-testid="button-submit-doc" onClick={addDoc}>שמור מסמך</button>
           </div>
         </div>
       </div></div>}
