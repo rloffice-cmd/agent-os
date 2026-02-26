@@ -289,7 +289,7 @@ export default function App() {
   const [vaultError, setVaultError] = useState("");
   const [vaultSecrets, setVaultSecrets] = useState<any[]>([]);
   const [vaultSalt, setVaultSalt] = useState<Uint8Array|null>(null);
-  const [vaultMasterPw, setVaultMasterPw] = useState("");
+  const vaultMasterPwRef = useRef("");
   const [vaultSearch, setVaultSearch] = useState("");
   const [vaultCatFilter, setVaultCatFilter] = useState("הכל");
   const [vaultShowFields, setVaultShowFields] = useState<any>({});
@@ -331,7 +331,7 @@ export default function App() {
       if(vaultAutoLock.current) clearTimeout(vaultAutoLock.current);
       vaultAutoLock.current = setTimeout(()=>{
         setVaultUnlocked(false);
-        setVaultMasterPw("");
+        vaultMasterPwRef.current = "";
         setVaultSecrets([]);
         setVaultShowFields({});
       }, VAULT_AUTO_LOCK_MS);
@@ -364,7 +364,7 @@ export default function App() {
     await vaultSetMeta(VAULT_META_VERIFY, verifyToken);
     setVaultSalt(salt);
     setVaultHasPassword(true);
-    setVaultMasterPw(vaultPassword);
+    vaultMasterPwRef.current = vaultPassword;
     setVaultUnlocked(true);
     setVaultPassword("");
     setVaultConfirm("");
@@ -379,7 +379,7 @@ export default function App() {
     if(!savedToken){setVaultError("שגיאה — לא נמצא אסימון אימות");return;}
     const valid = await validateVerifyToken(savedToken, vaultPassword, vaultSalt);
     if(!valid){setVaultError("סיסמה שגויה");return;}
-    setVaultMasterPw(vaultPassword);
+    vaultMasterPwRef.current = vaultPassword;
     setVaultUnlocked(true);
     setVaultPassword("");
     setVaultError("");
@@ -388,7 +388,7 @@ export default function App() {
 
   const vaultLock = ()=>{
     setVaultUnlocked(false);
-    setVaultMasterPw("");
+    vaultMasterPwRef.current = "";
     setVaultSecrets([]);
     setVaultShowFields({});
   };
@@ -407,7 +407,7 @@ export default function App() {
   };
 
   const saveVaultSecret = async()=>{
-    if(!vaultMasterPw||!vaultSalt||!vaultForm.name.trim()) return;
+    if(!vaultMasterPwRef.current||!vaultSalt||!vaultForm.name.trim()) return;
     const secretData = {
       name:vaultForm.name,
       category:vaultForm.category,
@@ -416,7 +416,7 @@ export default function App() {
       projects:vaultForm.projects.split(",").map(s=>s.trim()).filter(Boolean),
       notes:vaultForm.notes,
     };
-    const encrypted = await vaultEncrypt(JSON.stringify(secretData), vaultMasterPw, vaultSalt);
+    const encrypted = await vaultEncrypt(JSON.stringify(secretData), vaultMasterPwRef.current, vaultSalt);
     const now = new Date().toISOString();
     const meta = {category:secretData.category, service:secretData.service, field_count:secretData.fields.length, project_count:secretData.projects.length};
     if(vaultEditId){
@@ -471,7 +471,7 @@ export default function App() {
     if(data){
       for(const row of data){
         try{
-          const plain = await vaultDecrypt(row.encrypted_data, vaultMasterPw, vaultSalt);
+          const plain = await vaultDecrypt(row.encrypted_data, vaultMasterPwRef.current, vaultSalt);
           const reEncrypted = await vaultEncrypt(plain, vaultNewPw, newSalt);
           const now = new Date().toISOString();
           await sb.from("agent_vault_secrets").update({encrypted_data:reEncrypted, updated_at:now}).eq("id",row.id);
@@ -481,7 +481,7 @@ export default function App() {
     await vaultSetMeta(VAULT_META_SALT, bytesToHex(newSalt.buffer));
     await vaultSetMeta(VAULT_META_VERIFY, newVerifyToken);
     setVaultSalt(newSalt);
-    setVaultMasterPw(vaultNewPw);
+    vaultMasterPwRef.current = vaultNewPw;
     setVaultNewPw("");
     setVaultNewPwConfirm("");
     setVaultChangePw(false);
