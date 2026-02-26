@@ -79,7 +79,7 @@ const DEF_TOOLS = [
 // ─── Vault Crypto (AES-256-GCM + PBKDF2) ───────────────────
 const VAULT_ITERATIONS = 200000;
 const VAULT_META_SALT = "vault_salt";
-const VAULT_META_HASH = "vault_hash";
+const VAULT_META_VERIFY = "vault_verify_token";
 
 const hexToBytes = (hex:string) => new Uint8Array(hex.match(/.{1,2}/g)!.map(b=>parseInt(b,16)));
 const bytesToHex = (buf:ArrayBuffer) => [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,"0")).join("");
@@ -107,14 +107,18 @@ async function vaultDecrypt(ciphertext:string, password:string, salt:Uint8Array)
   return new TextDecoder().decode(pt);
 }
 
-async function hashPassword(password:string, salt:Uint8Array):Promise<string> {
-  const enc = new TextEncoder();
-  const keyMaterial = await crypto.subtle.importKey("raw", enc.encode(password), "PBKDF2", false, ["deriveBits"]);
-  const verifySalt = new Uint8Array(salt.length + 7);
-  verifySalt.set(salt);
-  verifySalt.set(enc.encode("_verify"), salt.length);
-  const bits = await crypto.subtle.deriveBits({name:"PBKDF2",salt:verifySalt,iterations:VAULT_ITERATIONS,hash:"SHA-256"}, keyMaterial, 256);
-  return bytesToHex(bits);
+async function createVerifyToken(password:string, salt:Uint8Array):Promise<string> {
+  const token = `VAULT_OK_${Date.now()}`;
+  return vaultEncrypt(token, password, salt);
+}
+
+async function validateVerifyToken(encrypted:string, password:string, salt:Uint8Array):Promise<boolean> {
+  try {
+    const decrypted = await vaultDecrypt(encrypted, password, salt);
+    return decrypted.startsWith("VAULT_OK_");
+  } catch(e) {
+    return false;
+  }
 }
 
 function getPasswordStrength(pw:string):{score:number,label:string,color:string} {
@@ -309,8 +313,8 @@ export default function App() {
         const {data} = await sb.from("agent_vault_meta").select("*");
         if(data){
           const saltRow = data.find((r:any)=>r.key===VAULT_META_SALT);
-          const hashRow = data.find((r:any)=>r.key===VAULT_META_HASH);
-          if(saltRow && hashRow){
+          const verifyRow = data.find((r:any)=>r.key===VAULT_META_VERIFY);
+          if(saltRow && verifyRow){
             setVaultHasPassword(true);
             setVaultSalt(hexToBytes(saltRow.value));
           }
@@ -355,9 +359,9 @@ export default function App() {
     if(vaultPassword.length<8){setVaultError("סיסמה חייבת להכיל לפחות 8 תווים");return;}
     if(vaultPassword!==vaultConfirm){setVaultError("סיסמאות לא תואמות");return;}
     const salt = crypto.getRandomValues(new Uint8Array(32));
-    const hash = await hashPassword(vaultPassword, salt);
+    const verifyToken = await createVerifyToken(vaultPassword, salt);
     await vaultSetMeta(VAULT_META_SALT, bytesToHex(salt.buffer));
-    await vaultSetMeta(VAULT_META_HASH, hash);
+    await vaultSetMeta(VAULT_META_VERIFY, verifyToken);
     setVaultSalt(salt);
     setVaultHasPassword(true);
     setVaultMasterPw(vaultPassword);
@@ -370,10 +374,11 @@ export default function App() {
 
   const vaultUnlock = async()=>{
     if(!vaultSalt) return;
-    const {data} = await sb.from("agent_vault_meta").select("value").eq("key",VAULT_META_HASH).single();
-    const savedHash = data?.value;
-    const hash = await hashPassword(vaultPassword, vaultSalt);
-    if(hash !== savedHash){setVaultError("סיסמה שגויה");return;}
+    const {data} = await sb.from("agent_vault_meta").select("value").eq("key",VAULT_META_VERIFY).single();
+    const savedToken = data?.value;
+    if(!savedToken){setVaultError("שגיאה — לא נמצא אסימון אימות");return;}
+    const valid = await validateVerifyToken(savedToken, vaultPassword, vaultSalt);
+    if(!valid){setVaultError("סיסמה שגויה");return;}
     setVaultMasterPw(vaultPassword);
     setVaultUnlocked(true);
     setVaultPassword("");
@@ -461,7 +466,7 @@ export default function App() {
     if(vaultNewPw.length<8){setVaultError("סיסמה חדשה חייבת להכיל לפחות 8 תווים");return;}
     if(vaultNewPw!==vaultNewPwConfirm){setVaultError("סיסמאות חדשות לא תואמות");return;}
     const newSalt = crypto.getRandomValues(new Uint8Array(32));
-    const newHash = await hashPassword(vaultNewPw, newSalt);
+    const newVerifyToken = await createVerifyToken(vaultNewPw, newSalt);
     const {data} = await sb.from("agent_vault_secrets").select("*");
     if(data){
       for(const row of data){
@@ -474,7 +479,7 @@ export default function App() {
       }
     }
     await vaultSetMeta(VAULT_META_SALT, bytesToHex(newSalt.buffer));
-    await vaultSetMeta(VAULT_META_HASH, newHash);
+    await vaultSetMeta(VAULT_META_VERIFY, newVerifyToken);
     setVaultSalt(newSalt);
     setVaultMasterPw(vaultNewPw);
     setVaultNewPw("");
