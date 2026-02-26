@@ -81,8 +81,8 @@ const VAULT_ITERATIONS = 200000;
 const VAULT_META_SALT = "vault_salt";
 const VAULT_META_VERIFY = "vault_verify_token";
 
-const hexToBytes = (hex:string) => new Uint8Array(hex.match(/.{1,2}/g)!.map(b=>parseInt(b,16)));
-const bytesToHex = (buf:ArrayBuffer) => [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,"0")).join("");
+const hexToBytes = (hex:string): Uint8Array => { const m = hex.match(/.{1,2}/g) || []; return new Uint8Array(m.map((b:string)=>parseInt(b,16))); };
+const bytesToHex = (buf:ArrayBuffer): string => Array.from(new Uint8Array(buf)).map((b:number)=>b.toString(16).padStart(2,"0")).join("");
 
 async function deriveKey(password:string, salt:Uint8Array):Promise<CryptoKey> {
   const enc = new TextEncoder();
