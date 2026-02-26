@@ -290,6 +290,7 @@ export default function App() {
   const [vaultSecrets, setVaultSecrets] = useState<any[]>([]);
   const [vaultSalt, setVaultSalt] = useState<Uint8Array|null>(null);
   const vaultMasterPwRef = useRef("");
+  const anthropicKey = useRef("");
   const [vaultSearch, setVaultSearch] = useState("");
   const [vaultCatFilter, setVaultCatFilter] = useState("הכל");
   const [vaultShowFields, setVaultShowFields] = useState<any>({});
@@ -347,6 +348,18 @@ export default function App() {
       document.removeEventListener("visibilitychange", onVisChange);
     };
   },[vaultUnlocked]);
+
+  useEffect(()=>{
+    if(vaultUnlocked && vaultSecrets.length > 0){
+      const s = vaultSecrets.find((x:any) => x.service?.toLowerCase().includes("anthropic") || x.name?.toLowerCase().includes("claude"));
+      if(s){
+        const keyField = s.fields?.find((f:any) => f.key?.toLowerCase().includes("key") || f.key?.toLowerCase().includes("api"));
+        if(keyField) anthropicKey.current = keyField.value || "";
+      }
+    } else {
+      anthropicKey.current = "";
+    }
+  },[vaultUnlocked, vaultSecrets]);
 
   const vaultSetMeta = async(key:string, value:string)=>{
     const {data} = await sb.from("agent_vault_meta").select("*").eq("key",key);
@@ -578,13 +591,17 @@ export default function App() {
   };
 
   const callAI = async(msg:string,extra="",hist:any[]=[])=>{
-    const r=await fetch("/api/ai/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1800,system:SYSTEM+"\n"+ctx()+"\n"+extra,messages:[...hist.slice(-16),{role:"user",content:msg}]})});
+    const key = import.meta.env.VITE_ANTHROPIC_KEY || anthropicKey.current;
+    if(!key) return "שגיאה: מפתח API לא הוגדר. הוסף VITE_ANTHROPIC_KEY ב-Secrets או שמור מפתח Anthropic בכספת.";
+    const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json","x-api-key":key,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1800,system:SYSTEM+"\n"+ctx()+"\n"+extra,messages:[...hist.slice(-16),{role:"user",content:msg}]})});
     const d=await r.json();
     return (d.content||[]).filter((b:any)=>b.type==="text").map((b:any)=>b.text).join("\n")||"שגיאה";
   };
 
   const callAISearch = async(msg:string)=>{
-    const r=await fetch("/api/ai/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:2000,system:SYSTEM,tools:[{type:"web_search_20250305",name:"web_search"}],messages:[{role:"user",content:msg}]})});
+    const key = import.meta.env.VITE_ANTHROPIC_KEY || anthropicKey.current;
+    if(!key) return "שגיאה: מפתח API לא הוגדר.";
+    const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json","x-api-key":key,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:2000,system:SYSTEM,tools:[{type:"web_search_20250305",name:"web_search"}],messages:[{role:"user",content:msg}]})});
     const d=await r.json();
     return (d.content||[]).filter((b:any)=>b.type==="text").map((b:any)=>b.text).join("\n")||"לא נמצא";
   };
