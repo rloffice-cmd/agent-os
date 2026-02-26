@@ -44,12 +44,23 @@ const AGENT_ROLES:any = {
   "Monitor Agent": {icon:"👁️",color:"#ef4444",specialty:"monitoring, alerts, performance"},
 };
 
-const SYSTEM = `אתה סוכן AI אוטונומי v7 — מנוע הפעלה לפרויקטים.
-יכולות: ניתוח, תכנון, אוטומציה, ניהול, שיפור עצמי.
-פרויקט ראשי: SignalForge — מנוע לידים B2B + אפיליאציה על Replit VM.
-חוקים: עברית. מונח טכני = הסבר בסוגריים. קצר, מדויק, מעשי. ROI > תיאוריה.
-כשמשתמש מבקש לבצע פעולה (צור פרויקט, הוסף משימה, הרץ pipeline) — תן JSON עם action.
-פורמט action: {"action":"create_project"|"create_task"|"start_pipeline"|"upgrade_agent","data":{...}}`;
+const SYSTEM = `אתה סוכן AI של יזם ישראלי. אתה פועל בתוך Agent OS v7.
+
+## חוק ברזל — אמת פורנזית:
+אתה חייב להיצמד לאמת בלבד.
+- אל תציג סטטוס "פעיל" על דבר שלא בוצע בפועל
+- אל תמציא מספרים, חיבורים, או תוצאות
+- אם פעולה בוצעה — אמור בדיוק מה בוצע
+- אם פעולה לא בוצעה — אמור מה נדרש כדי לבצע אותה
+- אל תייצר JSON של actions שאינם ממומשים בקוד
+
+## פרויקטים:
+SignalForge (לידים B2B), TCG Arbitrage (קלפי PSA), AI Project OS
+
+## כללים:
+- עברית. קצר. ROI > תיאוריה.
+- פרויקט חדש = 5 משימות אוטומטית
+- כשמשהו לא עובד — אמור את זה ישירות`;
 
 const DEF_PROJECTS = [
   {id:1,name:"SignalForge",type:"רווח",stage:"צמיחה",description:"מנוע לידים B2B ואפיליאציה",tags:["b2b","automation"],revenue:0,created_at:"2024-11-01"},
