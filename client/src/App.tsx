@@ -15,6 +15,14 @@ const PROMPT_CATS = ["הכל","קוד","עיצוב","שיווק","מחקר","א�
 const TOOL_CATS = ["הכל","פיתוח","אוטומציה","AI","דאטה","שיווק"];
 const VAULT_CATS = ["הכל","API Keys","Platforms","Accounts","Payment","Webhooks","Other"];
 const VAULT_CAT_ICONS:any = {"API Keys":"🔑","Platforms":"🌐","Accounts":"👤","Payment":"💳","Webhooks":"🔗","Other":"📦"};
+const VAULT_SERVICE_SUGGESTIONS:any = {
+  "API Keys":["OpenAI","Anthropic","Google Cloud","AWS","Replicate","Hugging Face","Cohere","Mistral","DeepSeek","Groq"],
+  "Platforms":["Replit","Vercel","Netlify","Railway","Heroku","DigitalOcean","Supabase","Firebase","Cloudflare","GitHub"],
+  "Accounts":["Google","Microsoft","Apple","GitHub","LinkedIn","Twitter/X","Discord","Slack","Notion","Figma"],
+  "Payment":["Stripe","PayPal","Lemon Squeezy","Paddle","Gumroad","Wise","Payoneer","Square","Coinbase","Revolut"],
+  "Webhooks":["n8n","Zapier","Make","IFTTT","Pipedream","Slack","Discord","Telegram","GitHub","Linear"],
+  "Other":["SSH Key","Database","SMTP","DNS","VPN","Certificate","License","Token","Seed Phrase","PIN"],
+};
 
 const PIPELINE_STAGES = [
   {id:"idea",icon:"💡",name:"גיבוש רעיון",color:"#6366f1",agents:["מנתח שוק","מחקר מתחרים","GO/NO-GO"],outputs:["One-liner","קהל יעד","3 מתחרים","המלצה"]},
@@ -1327,6 +1335,13 @@ export default function App() {
             </select>
             <input className="inp" data-testid="input-vault-service" style={{flex:1}} placeholder="שירות (Stripe, AWS...)" value={vaultForm.service} onChange={e=>setVaultForm(f=>({...f,service:e.target.value}))}/>
           </div>
+          {VAULT_SERVICE_SUGGESTIONS[vaultForm.category]&&(
+            <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+              {VAULT_SERVICE_SUGGESTIONS[vaultForm.category].map((svc:string)=>(
+                <button key={svc} type="button" style={{background:vaultForm.service===svc?"#3d0a30":"var(--bg3)",border:`1px solid ${vaultForm.service===svc?"var(--vault)":"var(--border)"}`,borderRadius:6,padding:"3px 9px",color:vaultForm.service===svc?"var(--vault)":"var(--text3)",cursor:"pointer",fontSize:"11px",fontFamily:"Noto Sans Hebrew,sans-serif",transition:"all .15s"}} onClick={()=>setVaultForm(f=>({...f,service:svc}))}>{svc}</button>
+              ))}
+            </div>
+          )}
           <div style={{fontSize:"12px",color:"var(--text3)",fontWeight:600,marginTop:4}}>שדות (key → value):</div>
           {vaultForm.fields.map((field,i)=>(
             <div key={i} style={{display:"flex",gap:6,alignItems:"center"}}>
