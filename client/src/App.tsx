@@ -619,7 +619,7 @@ export default function App() {
     const userMsg={role:"user",content:chatInput};
     const newMsgs=[...msgs,userMsg];
     setMsgs(newMsgs);setChatInput("");setChatLoading(true);
-    await sb.from("agent_messages").insert({role:"user",content:chatInput}).catch(()=>{});
+    try{await sb.from("agent_messages").insert({role:"user",content:chatInput});}catch(e){}
     try{
       const needsSearch=/חדש|עדכני|2025|2026|אחרון|חפש|שוק/i.test(chatInput);
       const extra=`\nכשהמשתמש מבקש פעולה, כלול JSON action בתשובה. לדוגמה: 'צור פרויקט X' → תן תשובה + {"action":"create_project","data":{"name":"X","type":"רווח","stage":"רעיון"}}\nפעולות: create_project, create_task, start_pipeline, upgrade_agent, show_vault\nכשמשתמש אומר "פתח כספת" או "vault" או "סודות" → {"action":"show_vault","data":{}}`;
@@ -628,7 +628,7 @@ export default function App() {
       else reply=await callAI(chatInput,extra,newMsgs.slice(-20).map((m:any)=>({role:m.role==="action"?"assistant":m.role,content:m.content})));
       const action=parseAgentAction(reply);
       const cleanReply=reply.replace(/\{"action":.*?\}/s,"").trim();
-      await sb.from("agent_messages").insert({role:"assistant",content:cleanReply}).catch(()=>{});
+      try{await sb.from("agent_messages").insert({role:"assistant",content:cleanReply});}catch(e){}
       if(action){
         const actionResult=await executeAction(action.action,action.data||{});
         setMsgs([...newMsgs,{role:"assistant",content:cleanReply},{role:"action",content:actionResult||""}].filter((m:any)=>m.content));
