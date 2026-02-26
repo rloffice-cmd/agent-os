@@ -603,6 +603,8 @@ export default function App() {
         return `🎯 Pipeline הופעל עבור "${data.name}" — עובר לטאב Pipeline`;
       case "upgrade_agent":
         setTab("🔬");return `🔬 עובר ל-Lab לשדרוג — מה תרצה לשנות?`;
+      case "show_vault":
+        setTab("🔐");return `🔐 עובר ל-Vault — הכספת המוצפנת שלך`;
       default:return null;
     }
   };
@@ -615,7 +617,7 @@ export default function App() {
     await sb.from("agent_messages").insert({role:"user",content:chatInput}).catch(()=>{});
     try{
       const needsSearch=/חדש|עדכני|2025|2026|אחרון|חפש|שוק/i.test(chatInput);
-      const extra=`\nכשהמשתמש מבקש פעולה, כלול JSON action בתשובה. לדוגמה: 'צור פרויקט X' → תן תשובה + {"action":"create_project","data":{"name":"X","type":"רווח","stage":"רעיון"}}\nפעולות: create_project, create_task, start_pipeline, upgrade_agent`;
+      const extra=`\nכשהמשתמש מבקש פעולה, כלול JSON action בתשובה. לדוגמה: 'צור פרויקט X' → תן תשובה + {"action":"create_project","data":{"name":"X","type":"רווח","stage":"רעיון"}}\nפעולות: create_project, create_task, start_pipeline, upgrade_agent, show_vault\nכשמשתמש אומר "פתח כספת" או "vault" או "סודות" → {"action":"show_vault","data":{}}`;
       let reply;
       if(needsSearch) reply=await callAISearch(chatInput);
       else reply=await callAI(chatInput,extra,newMsgs.slice(-20).map((m:any)=>({role:m.role==="action"?"assistant":m.role,content:m.content})));
@@ -741,6 +743,10 @@ export default function App() {
             </button>
           ))}
         </div>
+        {vaultUnlocked&&<div data-testid="pill-vault-unlocked" style={{display:"flex",alignItems:"center",gap:5,marginRight:10,padding:"4px 10px",borderRadius:20,background:"#1a052030",border:"1px solid #3d0a30",cursor:"pointer",flexShrink:0}} onClick={()=>setTab("🔐")}>
+          <div className="live-dot" style={{background:"var(--vault)"}}/>
+          <span style={{fontSize:"11px",color:"var(--vault)",fontWeight:700,whiteSpace:"nowrap"}}>🔐 Vault פתוח</span>
+        </div>}
         {sfStats&&<div style={{display:"flex",gap:6,marginRight:12,flexShrink:0}} className="hide-mobile">
           <div className="stat" style={{padding:"5px 10px"}}>
             <div className="stat-val" style={{fontSize:"15px",color:"var(--sf)"}}>{sfStats.leadsFound??"-"}</div>
