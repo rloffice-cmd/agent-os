@@ -350,8 +350,8 @@ export default function App() {
 
   const vaultSetMeta = async(key:string, value:string)=>{
     const {data} = await sb.from("agent_vault_meta").select("*").eq("key",key);
-    if(data&&data.length>0) await sb.from("agent_vault_meta").update({value}).eq("key",key).select();
-    else await sb.from("agent_vault_meta").insert({key,value}).select();
+    if(data&&data.length>0) await sb.from("agent_vault_meta").update({value}).eq("key",key);
+    else await sb.from("agent_vault_meta").insert({key,value});
   };
 
   // ── Vault Crypto Operations ─────────────────────────────
@@ -420,11 +420,11 @@ export default function App() {
     const now = new Date().toISOString();
     const meta = {category:secretData.category, service:secretData.service, field_count:secretData.fields.length, project_count:secretData.projects.length};
     if(vaultEditId){
-      await sb.from("agent_vault_secrets").update({encrypted_data:encrypted, meta, updated_at:now}).eq("id",vaultEditId).select();
+      await sb.from("agent_vault_secrets").update({encrypted_data:encrypted, meta, updated_at:now}).eq("id",vaultEditId);
       setVaultSecrets(prev=>prev.map(s=>s.id===vaultEditId?{...secretData,id:vaultEditId,created_at:s.created_at,updated_at:now,meta}:s));
     } else {
       const id = crypto.randomUUID();
-      await sb.from("agent_vault_secrets").insert({id, encrypted_data:encrypted, meta, created_at:now, updated_at:now}).select();
+      await sb.from("agent_vault_secrets").insert({id, encrypted_data:encrypted, meta, created_at:now, updated_at:now});
       setVaultSecrets(prev=>[{...secretData,id,created_at:now,updated_at:now,meta},...prev]);
     }
     setVaultModal(false);
@@ -433,7 +433,7 @@ export default function App() {
   };
 
   const deleteVaultSecret = async(id:string)=>{
-    await sb.from("agent_vault_secrets").delete().eq("id",id).select();
+    await sb.from("agent_vault_secrets").delete().eq("id",id);
     setVaultSecrets(prev=>prev.filter(s=>s.id!==id));
   };
 
@@ -474,7 +474,7 @@ export default function App() {
           const plain = await vaultDecrypt(row.encrypted_data, vaultMasterPwRef.current, vaultSalt);
           const reEncrypted = await vaultEncrypt(plain, vaultNewPw, newSalt);
           const now = new Date().toISOString();
-          await sb.from("agent_vault_secrets").update({encrypted_data:reEncrypted, updated_at:now}).eq("id",row.id).select();
+          await sb.from("agent_vault_secrets").update({encrypted_data:reEncrypted, updated_at:now}).eq("id",row.id);
         }catch(e){}
       }
     }
@@ -535,11 +535,11 @@ export default function App() {
       sb.from("agent_tools").select("*"),
       sb.from("agent_messages").select("*").order("created_at",{ascending:true}).limit(80),
     ]);
-    if(!p.error&&p.data?.length)setProjects(p.data);else{await sb.from("agent_projects").insert(DEF_PROJECTS).select();setProjects(DEF_PROJECTS);}
-    if(!t.error&&t.data?.length)setTasks(t.data);else{await sb.from("agent_tasks").insert(DEF_TASKS).select();setTasks(DEF_TASKS);}
-    if(!pr.error&&pr.data?.length)setPrompts(pr.data);else{await sb.from("agent_prompts").insert(DEF_PROMPTS).select();setPrompts(DEF_PROMPTS);}
-    if(!k.error&&k.data?.length)setKnowledge(k.data);else{await sb.from("agent_knowledge").insert(DEF_KNOWLEDGE).select();setKnowledge(DEF_KNOWLEDGE);}
-    if(!to.error&&to.data?.length)setTools(to.data);else{await sb.from("agent_tools").insert(DEF_TOOLS).select();setTools(DEF_TOOLS);}
+    if(!p.error&&p.data?.length)setProjects(p.data);else{await sb.from("agent_projects").insert(DEF_PROJECTS);setProjects(DEF_PROJECTS);}
+    if(!t.error&&t.data?.length)setTasks(t.data);else{await sb.from("agent_tasks").insert(DEF_TASKS);setTasks(DEF_TASKS);}
+    if(!pr.error&&pr.data?.length)setPrompts(pr.data);else{await sb.from("agent_prompts").insert(DEF_PROMPTS);setPrompts(DEF_PROMPTS);}
+    if(!k.error&&k.data?.length)setKnowledge(k.data);else{await sb.from("agent_knowledge").insert(DEF_KNOWLEDGE);setKnowledge(DEF_KNOWLEDGE);}
+    if(!to.error&&to.data?.length)setTools(to.data);else{await sb.from("agent_tools").insert(DEF_TOOLS);setTools(DEF_TOOLS);}
     if(!m.error&&m.data?.length)setMsgs(m.data.map((x:any)=>({role:x.role,content:x.content})));
     setLoading(false);
     setSyncStatus("מסונכרן");
@@ -548,27 +548,27 @@ export default function App() {
   const save = async(op:()=>Promise<void>)=>{ setSyncStatus("שומר..."); try{await op();setSyncStatus("מסונכרן");}catch(e){setSyncStatus("שגיאה");} };
   const addProject = async(data:any=null)=>{
     const p=data||{...forms.proj,id:Date.now(),tags:forms.proj.tags.split(",").map((t:string)=>t.trim()).filter(Boolean),created_at:new Date().toISOString().split("T")[0],revenue:0};
-    save(async()=>{ await sb.from("agent_projects").insert(p).select(); setProjects(prev=>[...prev,p]); });
+    save(async()=>{ await sb.from("agent_projects").insert(p); setProjects(prev=>[...prev,p]); });
     setModals(m=>({...m,proj:false}));
   };
   const addTask = async(data:any=null)=>{
     const t=data||{...forms.task,id:Date.now(),project_id:activeProject,tags:forms.task.tags.split(",").map((x:string)=>x.trim()).filter(Boolean)};
-    save(async()=>{ await sb.from("agent_tasks").insert(t).select(); setTasks(prev=>[...prev,t]); });
+    save(async()=>{ await sb.from("agent_tasks").insert(t); setTasks(prev=>[...prev,t]); });
     setModals(m=>({...m,task:false}));
   };
   const addKnow = async(data:any=null)=>{
     const k=data||{...forms.know,id:Date.now(),tags:forms.know.tags.split(",").map((t:string)=>t.trim()).filter(Boolean),date:new Date().toISOString().split("T")[0]};
-    save(async()=>{ await sb.from("agent_knowledge").insert(k).select(); setKnowledge(prev=>[...prev,k]); });
+    save(async()=>{ await sb.from("agent_knowledge").insert(k); setKnowledge(prev=>[...prev,k]); });
     setModals(m=>({...m,know:false}));
   };
   const addPrompt = async()=>{
     const p={...forms.prompt,id:Date.now(),tags:forms.prompt.tags.split(",").map((t:string)=>t.trim()).filter(Boolean),uses:0,rating:5};
-    save(async()=>{ await sb.from("agent_prompts").insert(p).select(); setPrompts(prev=>[...prev,p]); });
+    save(async()=>{ await sb.from("agent_prompts").insert(p); setPrompts(prev=>[...prev,p]); });
     setModals(m=>({...m,prompt:false}));
   };
-  const moveTask = (id:number,col:string)=>save(async()=>{ await sb.from("agent_tasks").update({col}).eq("id",id).select(); setTasks(prev=>prev.map(t=>t.id===id?{...t,col}:t)); });
-  const updateProjStage = (id:number,stage:string)=>save(async()=>{ await sb.from("agent_projects").update({stage}).eq("id",id).select(); setProjects(p=>p.map(x=>x.id===id?{...x,stage}:x)); });
-  const del = (table:string,id:number,setter:any,arr:any[])=>save(async()=>{ await sb.from(table).delete().eq("id",id).select(); setter(arr.filter((x:any)=>x.id!==id)); });
+  const moveTask = (id:number,col:string)=>save(async()=>{ await sb.from("agent_tasks").update({col}).eq("id",id); setTasks(prev=>prev.map(t=>t.id===id?{...t,col}:t)); });
+  const updateProjStage = (id:number,stage:string)=>save(async()=>{ await sb.from("agent_projects").update({stage}).eq("id",id); setProjects(p=>p.map(x=>x.id===id?{...x,stage}:x)); });
+  const del = (table:string,id:number,setter:any,arr:any[])=>save(async()=>{ await sb.from(table).delete().eq("id",id); setter(arr.filter((x:any)=>x.id!==id)); });
 
   const ctx = ()=>{
     const ps=projects.map(p=>`${p.name}(${p.stage})`).join("|");
@@ -619,7 +619,7 @@ export default function App() {
     const userMsg={role:"user",content:chatInput};
     const newMsgs=[...msgs,userMsg];
     setMsgs(newMsgs);setChatInput("");setChatLoading(true);
-    try{await sb.from("agent_messages").insert({role:"user",content:chatInput}).select();}catch(e){}
+    await sb.from("agent_messages").insert({role:"user",content:chatInput});
     try{
       const needsSearch=/חדש|עדכני|2025|2026|אחרון|חפש|שוק/i.test(chatInput);
       const extra=`\nכשהמשתמש מבקש פעולה, כלול JSON action בתשובה. לדוגמה: 'צור פרויקט X' → תן תשובה + {"action":"create_project","data":{"name":"X","type":"רווח","stage":"רעיון"}}\nפעולות: create_project, create_task, start_pipeline, upgrade_agent, show_vault\nכשמשתמש אומר "פתח כספת" או "vault" או "סודות" → {"action":"show_vault","data":{}}`;
@@ -628,7 +628,7 @@ export default function App() {
       else reply=await callAI(chatInput,extra,newMsgs.slice(-20).map((m:any)=>({role:m.role==="action"?"assistant":m.role,content:m.content})));
       const action=parseAgentAction(reply);
       const cleanReply=reply.replace(/\{"action":.*?\}/s,"").trim();
-      try{await sb.from("agent_messages").insert({role:"assistant",content:cleanReply}).select();}catch(e){}
+      await sb.from("agent_messages").insert({role:"assistant",content:cleanReply});
       if(action){
         const actionResult=await executeAction(action.action,action.data||{});
         setMsgs([...newMsgs,{role:"assistant",content:cleanReply},{role:"action",content:actionResult||""}].filter((m:any)=>m.content));
@@ -708,7 +708,7 @@ export default function App() {
 
   const copyPrompt = async(id:number,text:string)=>{
     navigator.clipboard.writeText(text).catch(()=>{});
-    await sb.from("agent_prompts").update({uses:(prompts.find(p=>p.id===id)?.uses||0)+1}).eq("id",id).select();
+    await sb.from("agent_prompts").update({uses:(prompts.find(p=>p.id===id)?.uses||0)+1}).eq("id",id);
     setPrompts(p=>p.map(x=>x.id===id?{...x,uses:x.uses+1}:x));
     setCopied(id);setTimeout(()=>setCopied(null),1800);
   };
