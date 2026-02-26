@@ -78,8 +78,8 @@ const DEF_TOOLS = [
 
 // ─── Vault Crypto (AES-256-GCM + PBKDF2) ───────────────────
 const VAULT_ITERATIONS = 200000;
-const VAULT_SALT_KEY = "vault_salt_v7";
-const VAULT_HASH_KEY = "vault_hash_v7";
+const VAULT_META_SALT = "vault_salt";
+const VAULT_META_HASH = "vault_hash";
 
 const hexToBytes = (hex:string) => new Uint8Array(hex.match(/.{1,2}/g)!.map(b=>parseInt(b,16)));
 const bytesToHex = (buf:ArrayBuffer) => [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,"0")).join("");
@@ -290,7 +290,7 @@ export default function App() {
   const [vaultCatFilter, setVaultCatFilter] = useState("הכל");
   const [vaultShowFields, setVaultShowFields] = useState<any>({});
   const [vaultModal, setVaultModal] = useState(false);
-  const [vaultEditId, setVaultEditId] = useState<number|null>(null);
+  const [vaultEditId, setVaultEditId] = useState<string|null>(null);
   const [vaultForm, setVaultForm] = useState({name:"",category:"API Keys",service:"",fields:[{key:"",value:""}] as {key:string,value:string}[],projects:"",notes:""});
   const [vaultCopiedField, setVaultCopiedField] = useState<string|null>(null);
   const [vaultChangePw, setVaultChangePw] = useState(false);
@@ -300,14 +300,24 @@ export default function App() {
   const vaultClipboardTimer = useRef<any>(null);
   const VAULT_AUTO_LOCK_MS = 10 * 60 * 1000;
 
-  // ── Vault Init ──────────────────────────────────────────
+  const [vaultInitLoading, setVaultInitLoading] = useState(true);
+
+  // ── Vault Init (load meta from Supabase) ──────────────
   useEffect(()=>{
-    const savedSalt = localStorage.getItem(VAULT_SALT_KEY);
-    const savedHash = localStorage.getItem(VAULT_HASH_KEY);
-    if(savedSalt && savedHash){
-      setVaultHasPassword(true);
-      setVaultSalt(hexToBytes(savedSalt));
-    }
+    (async()=>{
+      try{
+        const {data} = await sb.from("agent_vault_meta").select("*");
+        if(data){
+          const saltRow = data.find((r:any)=>r.key===VAULT_META_SALT);
+          const hashRow = data.find((r:any)=>r.key===VAULT_META_HASH);
+          if(saltRow && hashRow){
+            setVaultHasPassword(true);
+            setVaultSalt(hexToBytes(saltRow.value));
+          }
+        }
+      }catch(e){}
+      setVaultInitLoading(false);
+    })();
   },[]);
 
   // ── Vault Auto-Lock ─────────────────────────────────────
@@ -334,14 +344,20 @@ export default function App() {
     };
   },[vaultUnlocked]);
 
+  const vaultSetMeta = async(key:string, value:string)=>{
+    const {data} = await sb.from("agent_vault_meta").select("*").eq("key",key);
+    if(data&&data.length>0) await sb.from("agent_vault_meta").update({value}).eq("key",key);
+    else await sb.from("agent_vault_meta").insert({key,value});
+  };
+
   // ── Vault Crypto Operations ─────────────────────────────
   const vaultSetupPassword = async()=>{
     if(vaultPassword.length<8){setVaultError("סיסמה חייבת להכיל לפחות 8 תווים");return;}
     if(vaultPassword!==vaultConfirm){setVaultError("סיסמאות לא תואמות");return;}
     const salt = crypto.getRandomValues(new Uint8Array(32));
     const hash = await hashPassword(vaultPassword, salt);
-    localStorage.setItem(VAULT_SALT_KEY, bytesToHex(salt.buffer));
-    localStorage.setItem(VAULT_HASH_KEY, hash);
+    await vaultSetMeta(VAULT_META_SALT, bytesToHex(salt.buffer));
+    await vaultSetMeta(VAULT_META_HASH, hash);
     setVaultSalt(salt);
     setVaultHasPassword(true);
     setVaultMasterPw(vaultPassword);
@@ -354,7 +370,8 @@ export default function App() {
 
   const vaultUnlock = async()=>{
     if(!vaultSalt) return;
-    const savedHash = localStorage.getItem(VAULT_HASH_KEY);
+    const {data} = await sb.from("agent_vault_meta").select("value").eq("key",VAULT_META_HASH).single();
+    const savedHash = data?.value;
     const hash = await hashPassword(vaultPassword, vaultSalt);
     if(hash !== savedHash){setVaultError("סיסמה שגויה");return;}
     setVaultMasterPw(vaultPassword);
@@ -372,13 +389,13 @@ export default function App() {
   };
 
   const loadVaultSecrets = async(pw:string, salt:Uint8Array)=>{
-    const {data,error} = await sb.from("agent_vault").select("*").order("created_at",{ascending:false});
+    const {data,error} = await sb.from("agent_vault_secrets").select("*").order("created_at",{ascending:false});
     if(error||!data){setVaultSecrets([]);return;}
     const decrypted = [];
     for(const row of data){
       try{
         const plain = await vaultDecrypt(row.encrypted_data, pw, salt);
-        decrypted.push({...JSON.parse(plain), id:row.id, created_at:row.created_at});
+        decrypted.push({...JSON.parse(plain), id:row.id, created_at:row.created_at, updated_at:row.updated_at, meta:row.meta});
       }catch(e){}
     }
     setVaultSecrets(decrypted);
@@ -395,21 +412,23 @@ export default function App() {
       notes:vaultForm.notes,
     };
     const encrypted = await vaultEncrypt(JSON.stringify(secretData), vaultMasterPw, vaultSalt);
+    const now = new Date().toISOString();
+    const meta = {category:secretData.category, service:secretData.service, field_count:secretData.fields.length, project_count:secretData.projects.length};
     if(vaultEditId){
-      await sb.from("agent_vault").update({encrypted_data:encrypted}).eq("id",vaultEditId);
-      setVaultSecrets(prev=>prev.map(s=>s.id===vaultEditId?{...secretData,id:vaultEditId,created_at:s.created_at}:s));
+      await sb.from("agent_vault_secrets").update({encrypted_data:encrypted, meta, updated_at:now}).eq("id",vaultEditId);
+      setVaultSecrets(prev=>prev.map(s=>s.id===vaultEditId?{...secretData,id:vaultEditId,created_at:s.created_at,updated_at:now,meta}:s));
     } else {
-      const id = Date.now();
-      await sb.from("agent_vault").insert({id, encrypted_data:encrypted, created_at:new Date().toISOString()});
-      setVaultSecrets(prev=>[{...secretData,id,created_at:new Date().toISOString()},...prev]);
+      const id = crypto.randomUUID();
+      await sb.from("agent_vault_secrets").insert({id, encrypted_data:encrypted, meta, created_at:now, updated_at:now});
+      setVaultSecrets(prev=>[{...secretData,id,created_at:now,updated_at:now,meta},...prev]);
     }
     setVaultModal(false);
     setVaultEditId(null);
     setVaultForm({name:"",category:"API Keys",service:"",fields:[{key:"",value:""}],projects:"",notes:""});
   };
 
-  const deleteVaultSecret = async(id:number)=>{
-    await sb.from("agent_vault").delete().eq("id",id);
+  const deleteVaultSecret = async(id:string)=>{
+    await sb.from("agent_vault_secrets").delete().eq("id",id);
     setVaultSecrets(prev=>prev.filter(s=>s.id!==id));
   };
 
@@ -443,18 +462,19 @@ export default function App() {
     if(vaultNewPw!==vaultNewPwConfirm){setVaultError("סיסמאות חדשות לא תואמות");return;}
     const newSalt = crypto.getRandomValues(new Uint8Array(32));
     const newHash = await hashPassword(vaultNewPw, newSalt);
-    const {data} = await sb.from("agent_vault").select("*");
+    const {data} = await sb.from("agent_vault_secrets").select("*");
     if(data){
       for(const row of data){
         try{
           const plain = await vaultDecrypt(row.encrypted_data, vaultMasterPw, vaultSalt);
           const reEncrypted = await vaultEncrypt(plain, vaultNewPw, newSalt);
-          await sb.from("agent_vault").update({encrypted_data:reEncrypted}).eq("id",row.id);
+          const now = new Date().toISOString();
+          await sb.from("agent_vault_secrets").update({encrypted_data:reEncrypted, updated_at:now}).eq("id",row.id);
         }catch(e){}
       }
     }
-    localStorage.setItem(VAULT_SALT_KEY, bytesToHex(newSalt.buffer));
-    localStorage.setItem(VAULT_HASH_KEY, newHash);
+    await vaultSetMeta(VAULT_META_SALT, bytesToHex(newSalt.buffer));
+    await vaultSetMeta(VAULT_META_HASH, newHash);
     setVaultSalt(newSalt);
     setVaultMasterPw(vaultNewPw);
     setVaultNewPw("");
@@ -1119,7 +1139,15 @@ export default function App() {
         {/* ════ VAULT ════ */}
         {tab==="🔐"&&(
           <div className="fade-in">
-            {!vaultHasPassword?(
+            {vaultInitLoading?(
+              <div className="vault-lock-screen">
+                <div className="vault-lock-box">
+                  <div style={{fontSize:"48px",marginBottom:16}}>🔐</div>
+                  <div style={{width:24,height:24,border:"2px solid #1a2d45",borderTop:"2px solid var(--vault)",borderRadius:"50%",animation:"spin 1s linear infinite",margin:"0 auto 12px"}}/>
+                  <div style={{fontSize:"13px",color:"var(--text3)"}}>טוען Vault...</div>
+                </div>
+              </div>
+            ):!vaultHasPassword?(
               <div className="vault-lock-screen">
                 <div className="vault-lock-box">
                   <div style={{fontSize:"48px",marginBottom:16}}>🔐</div>

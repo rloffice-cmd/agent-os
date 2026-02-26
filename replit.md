@@ -29,8 +29,11 @@ Hebrew-language AI Project Management OS for an Israeli entrepreneur. Built with
 - **Categories**: API Keys 🔑, Platforms 🌐, Accounts 👤, Payment 💳, Webhooks 🔗, Other 📦
 - **Secret Structure**: name, category, service, fields (key-value pairs), projects array, notes
 - **Features**: Create/edit/delete secrets, search & filter by category/text, show/hide toggle per field, category stats dashboard, master password change with re-encryption
-- **Storage**: Encrypted blobs in Supabase `agent_vault` table (id BIGINT, encrypted_data TEXT, created_at TEXT)
-- **Client Storage**: Salt (hex) in localStorage key `vault_salt_v7`, password hash in localStorage key `vault_hash_v7`
+- **Storage**: Two Supabase tables:
+  - `agent_vault_secrets` (id UUID, encrypted_data TEXT, meta JSONB, created_at TIMESTAMPTZ, updated_at TIMESTAMPTZ)
+  - `agent_vault_meta` (key TEXT PRIMARY KEY, value TEXT) — stores vault_salt and vault_hash
+- **Meta stored in Supabase**: Salt and password hash are stored server-side in `agent_vault_meta`, not in localStorage
+- **Meta JSONB**: Unencrypted metadata per secret (category, service, field_count, project_count) for potential server-side filtering
 - **Design**: --vault:#f472b6 color, vault-specific CSS classes (.vault-lock-screen, .vault-secret-card, .vault-field, .strength-bar)
 
 ## Design System
@@ -40,9 +43,10 @@ Hebrew-language AI Project Management OS for an Israeli entrepreneur. Built with
 
 ## Supabase
 - URL: `https://pkviptoytcrdnhhspmtq.supabase.co`
-- Tables: agent_projects, agent_tasks, agent_prompts, agent_knowledge, agent_tools, agent_messages, agent_vault
+- Tables: agent_projects, agent_tasks, agent_prompts, agent_knowledge, agent_tools, agent_messages, agent_vault_secrets, agent_vault_meta
 - Real-time subscriptions on agent_tasks, agent_projects
-- agent_vault schema: id (BIGINT), encrypted_data (TEXT), created_at (TEXT)
+- agent_vault_secrets schema: id (UUID), encrypted_data (TEXT), meta (JSONB), created_at (TIMESTAMPTZ), updated_at (TIMESTAMPTZ)
+- agent_vault_meta schema: key (TEXT PK), value (TEXT)
 
 ## Environment Variables
 - `ANTHROPIC_API_KEY` — required for Claude AI features (bot + frontend AI calls)
