@@ -578,13 +578,13 @@ export default function App() {
   };
 
   const callAI = async(msg:string,extra="",hist:any[]=[])=>{
-    const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1800,system:SYSTEM+"\n"+ctx()+"\n"+extra,messages:[...hist.slice(-16),{role:"user",content:msg}]})});
+    const r=await fetch("/api/ai/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1800,system:SYSTEM+"\n"+ctx()+"\n"+extra,messages:[...hist.slice(-16),{role:"user",content:msg}]})});
     const d=await r.json();
     return (d.content||[]).filter((b:any)=>b.type==="text").map((b:any)=>b.text).join("\n")||"שגיאה";
   };
 
   const callAISearch = async(msg:string)=>{
-    const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:2000,system:SYSTEM,tools:[{type:"web_search_20250305",name:"web_search"}],messages:[{role:"user",content:msg}]})});
+    const r=await fetch("/api/ai/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:2000,system:SYSTEM,tools:[{type:"web_search_20250305",name:"web_search"}],messages:[{role:"user",content:msg}]})});
     const d=await r.json();
     return (d.content||[]).filter((b:any)=>b.type==="text").map((b:any)=>b.text).join("\n")||"לא נמצא";
   };
