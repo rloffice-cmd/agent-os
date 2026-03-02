@@ -1,60 +1,191 @@
-# AI Project Management OS v7 (Hebrew)
+# Agent OS – מנהל הסוכנים
+## סיכום פרויקט מלא | עודכן: 2026-03-02
 
-## Overview
-Hebrew-language AI Project Management OS for an Israeli entrepreneur. Built with React + Vite + Supabase, managing projects, Kanban tasks, prompts, knowledge base, and AI tools. v7 focuses on agentic automation: multi-agent Orchestrator, 7-stage Pipeline, SignalForge B2B lead engine monitoring, self-upgrade engine, agentic chat that can autonomously create projects/tasks and trigger pipelines, and an encrypted Vault for secure credential storage. A companion Telegram bot provides mobile access.
+---
 
-## Architecture
-- **Frontend**: Single-file React app (`client/src/App.tsx`) with inline CSS, custom design system (no shadcn/Tailwind)
-- **Backend**: Express server (template default, mostly unused — app talks directly to Supabase)
-- **Database**: Supabase (external) — tables: `agent_projects`, `agent_tasks`, `agent_prompts`, `agent_knowledge`, `agent_tools`, `agent_messages`, `agent_vault`
-- **Telegram Bot**: `telegram-bot.js` — standalone Node.js ES module with polling
-- **AI**: Claude claude-sonnet-4-20250514 via Anthropic API (called directly from frontend)
+## זהות הפרויקט
 
-## Key Features (v7)
-- **10 Tabs**: פיקוד (Command), Pipeline, Orchestrator, SignalForge, פרויקטים, משימות, Analytics, Lab, Vault 🔐, Agent HQ
-- **7-Stage Pipeline**: idea → spec → build → automate → test → launch → operate (each with AI agents)
-- **Multi-Agent Orchestrator**: Runs מנתח שוק, ארכיטקט, PM, Growth Hacker sequentially with real results
-- **SignalForge Live Monitoring**: Polls external SF app every 60s for leads/emails/DB status
-- **Self-Upgrade Engine (Lab)**: AI analyzes itself, proposes improvements
-- **Agentic Chat (Agent HQ)**: AI parses JSON actions (create_project, create_task, start_pipeline, upgrade_agent)
-- **Analytics & ROI**: Project progress, task load, market research with web search
-- **Encrypted Vault**: Client-side AES-256-GCM + PBKDF2 (200k iterations) for secure secret storage
-- **Mobile bottom nav**: Responsive with safe-area support, includes Vault tab
+- **שם:** Agent OS / מנהל הסוכנים
+- **מטרה:** מערכת ניהול סוכני AI עם Pipeline אוטומטי מ-רעיון עד הפעלה
+- **בעלים:** rloffice@gmail.com (Dan, rloffice-cmd)
+- **Replit URL:** https://vite-react-starter-rloffice.replit.app
+- **GitHub:** https://github.com/rloffice-cmd/agent-os
+- **Vercel Production:** https://agent-os-bay.vercel.app
 
-## Encrypted Vault (🔐)
-- **Encryption**: AES-256-GCM with PBKDF2 key derivation (200,000 iterations), all client-side via Web Crypto API
-- **Master Password**: First-time setup screen with password strength indicator; lock/unlock screen for returning users
-- **Auto-Lock**: 10-minute inactivity timer (resets on mousedown/keydown/scroll/touchstart)
-- **Clipboard Security**: Auto-clears clipboard 30 seconds after copying any secret value
-- **Categories**: API Keys 🔑, Platforms 🌐, Accounts 👤, Payment 💳, Webhooks 🔗, Other 📦
-- **Secret Structure**: name, category, service, fields (key-value pairs), projects array, notes
-- **Features**: Create/edit/delete secrets, search & filter by category/text, show/hide toggle per field, category stats dashboard, master password change with re-encryption
-- **Storage**: Two Supabase tables:
-  - `agent_vault_secrets` (id UUID, encrypted_data TEXT, meta JSONB, created_at TIMESTAMPTZ, updated_at TIMESTAMPTZ)
-  - `agent_vault_meta` (key TEXT PRIMARY KEY, value TEXT) — stores vault_salt and vault_hash
-- **Meta stored in Supabase**: Salt and password hash are stored server-side in `agent_vault_meta`, not in localStorage
-- **Meta JSONB**: Unencrypted metadata per secret (category, service, field_count, project_count) for potential server-side filtering
-- **Design**: --vault:#f472b6 color, vault-specific CSS classes (.vault-lock-screen, .vault-secret-card, .vault-field, .strength-bar)
+---
 
-## Design System
-- CSS variables: --bg:#04080f, --accent:#5b8def, --sf:#00e5a0, --purple:#a78bfa, --vault:#f472b6
-- Fonts: Syne (headings), JetBrains Mono (code), Noto Sans Hebrew (body)
-- Dark theme only, RTL layout
+## ארכיטקטורה
 
-## Supabase
-- URL: `https://pkviptoytcrdnhhspmtq.supabase.co`
-- Tables: agent_projects, agent_tasks, agent_prompts, agent_knowledge, agent_tools, agent_messages, agent_vault_secrets, agent_vault_meta
-- Real-time subscriptions on agent_tasks, agent_projects
-- agent_vault_secrets schema: id (UUID), encrypted_data (TEXT), meta (JSONB), created_at (TIMESTAMPTZ), updated_at (TIMESTAMPTZ)
-- agent_vault_meta schema: key (TEXT PK), value (TEXT)
+### Stack
+- **Frontend:** React + TypeScript + Vite (client/src/App.tsx)
+- **Backend:** Express + TypeScript (server/index.ts + server/routes.ts)
+- **Database:** Supabase (REST API ישיר, ללא SDK)
+- **AI:** Anthropic Claude claude-sonnet-4-20250514
+- **Hosting:** Replit (production) + Vercel (frontend static)
+
+### הפעלת השרת
+```bash
+# חשוב: חייב לטעון .env לפני הרצה
+npm run dev
+# הסקריפט כולל: tsx --env-file=.env server/index.ts
+```
+
+---
 
 ## Environment Variables
-- `ANTHROPIC_API_KEY` — required for Claude AI features (bot + frontend AI calls)
-- `SESSION_SECRET` — Express session
 
-## External Integrations
-- **SignalForge**: `https://42db220e-5803-46ef-b732-23785edabd76-00-26knnqjmug8l8.picard.replit.dev` (B2B lead engine on separate Replit)
+### ב-.env (Replit workspace)
+```
+SUPABASE_URL=https://pkviptoytcrdnhhspmtq.supabase.co
+SUPABASE_ANON_KEY=eyJhbGci... (208 תווים)
+```
 
-## Workflows
-- **Start application**: `npm run dev` (port 5000)
-- **Telegram Bot**: `node --experimental-modules telegram-bot.js` (port 3000)
+### ב-Replit Secrets (אוטומטי בסביבה)
+```
+ANTHROPIC_API_KEY=sk-ant-api03-...
+```
+
+### ב-Vercel (הוגדרו דרך API)
+- SUPABASE_URL ✅
+- SUPABASE_ANON_KEY ✅  
+- ANTHROPIC_API_KEY ✅
+
+---
+
+## Supabase
+
+- **Project ID:** pkviptoytcrdnhhspmtq
+- **URL:** https://pkviptoytcrdnhhspmtq.supabase.co
+
+### טבלאות
+```sql
+agent_tasks: id, project_id, title, description, col, priority, due_date, tags(jsonb)
+agent_projects: id, name, type, stage, description, tags(jsonb), created_at
+```
+
+### שימוש בקוד (ללא SDK!)
+```typescript
+// תמיד להשתמש ב-fetch ישיר, לא @supabase/supabase-js
+const sUrl = process.env.SUPABASE_URL;
+const sKey = process.env.SUPABASE_ANON_KEY;
+const res = await fetch(`${sUrl}/rest/v1/agent_tasks?project_id=eq.${project_id}`, {
+  headers: {
+    'apikey': sKey,
+    'Authorization': `Bearer ${sKey}`
+  }
+});
+```
+
+---
+
+## API Endpoints
+
+| Method | Path | תיאור |
+|--------|------|--------|
+| GET | /api/health | בדיקת חיים |
+| POST | /api/ai/chat | צ'אט ישיר עם Claude |
+| POST | /api/pipeline/run | הרצת שלב Pipeline |
+| GET | /api/pipeline/status/:project_id | קבלת tasks מ-Supabase |
+
+### דוגמת קריאה ל-Pipeline
+```bash
+curl -X POST http://localhost:5000/api/pipeline/run \
+  -H "Content-Type: application/json" \
+  -d '{"project_id":1,"stage":"idea","project_name":"שם פרויקט","project_description":"תיאור"}'
+# Returns: {"success":true,"stage":"idea","result":"...תוכן בעברית...","tasks_created":1}
+```
+
+---
+
+## Pipeline – 7 שלבים
+
+כל שלב קורא ל-Anthropic עם system prompt בעברית ושומר תוצאה ב-Supabase.
+
+| idx | id | שם | תיאור |
+|-----|----|----|--------|
+| 0 | idea | 💡 רעיון | value prop, מתחרים, 3 זוויות שוק |
+| 1 | spec | 📋 מפרט | ארכיטקטורה, DB, API, UI |
+| 2 | build | 🔨 בנייה | קוד מלא, TypeScript types |
+| 3 | automate | ⚙️ אוטומציה | GitHub Actions, CI/CD |
+| 4 | test | 🧪 בדיקות | test plan, edge cases |
+| 5 | launch | 🚀 השקה | deployment checklist, release notes |
+| 6 | operate | 📊 תפעול | monitoring, KPIs, scale |
+
+### תוצאות בדיקה (2026-03-02)
+- idea ✅ 2,781 תווים
+- spec ✅ 6,030 תווים
+- build ✅ 5,482 תווים
+- automate ✅ 5,451 תווים
+- test ✅ 3,086 תווים
+- launch ✅ 5,058 תווים
+- operate ✅ 4,639 תווים
+
+---
+
+## MCP Servers (על Windows – C:\\Users\\dan)
+
+הוגדרו ב-Claude Code CLI (claude mcp add):
+
+| שם | Transport | כתובת |
+|----|-----------|--------|
+| github | http | https://api.githubcopilot.com/mcp |
+| filesystem | stdio | cmd /c npx @modelcontextprotocol/server-filesystem |
+| supabase | http | https://mcp.supabase.com/mcp?project_ref=pkviptoytcrdnhhspmtq |
+| gmail | - | מוגדר |
+| google-calendar | - | מוגדר |
+| asana | - | מוגדר |
+
+---
+
+## Git & Commits
+
+```bash
+# Remote עם PAT (לשימוש ב-Replit Shell)
+git push github main
+
+# Commits עיקריים
+ba84e94  feat: connect Pipeline UI to /api/pipeline/run backend
+443be03  fix: load .env via tsx --env-file for persistent Supabase config
+969906b  feat: Pipeline agent with 7 stages and Supabase integration
+```
+
+---
+
+## בעיות שנפתרו
+
+| בעיה | פתרון |
+|------|--------|
+| .env לא נטען ב-tsx | שינוי package.json: tsx --env-file=.env |
+| Supabase מחזיר "no config" | export vars לפני npm run dev |
+| git push נכשל ב-Replit | שימוש ב-remote github עם PAT |
+| Pipeline UI לא קרא לbackend | עדכון runPipeStage בApp.tsx ל-fetch('/api/pipeline/run') |
+| Vercel 404 על /api | Vercel הוא static frontend בלבד, API רק ב-Replit |
+
+---
+
+## מה עובד עכשיו
+
+- ✅ שרת Express על פורט 5000
+- ✅ כל 7 שלבי Pipeline עם Claude AI
+- ✅ שמירה לSupabase
+- ✅ UI מחובר לbackend
+- ✅ Vercel deploy עם env vars
+- ✅ GitHub sync
+
+## מה חסר / עתידי
+
+- ⬜ Vercel Serverless Functions (כדי שAPI יעבוד ב-production URL)
+- ⬜ Auth / login למשתמשים
+- ⬜ Dashboard לצפייה בתוצאות Pipeline
+- ⬜ Webhook מ-GitHub לauto-deploy
+
+---
+
+## הוראות לClaude Agent שקורא קובץ זה
+
+1. השרת מופעל עם `npm run dev` – כולל --env-file=.env אוטומטית
+2. לעולם אל תשתמש ב-@supabase/supabase-js – רק fetch ישיר
+3. להוסיף endpoints ב-server/routes.ts בלבד
+4. לdeploy: `git add . && git commit -m "..." && git push github main`
+5. ה-API זמין רק ב-Replit, לא ב-Vercel
+6. project_id=3 הוא פרויקט הtest הקיים ב-Supabase
