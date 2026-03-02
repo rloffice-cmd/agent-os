@@ -701,20 +701,18 @@ export default function App() {
     setOrchRunning(false);
   };
 
-  const runPipeStage = async(stageIdx:number)=>{
+  const runPipeStage = async (stageIdx:number)=>{
     if(!pipelineProject) return;
     setPipeRunning(stageIdx);
     const stage=PIPELINE_STAGES[stageIdx];
-    const results=[];
-    for(const agentName of stage.agents){
-      const agentInfo=AGENT_ROLES[agentName]||{specialty:"general"};
-      const r=await callAI(`אתה ${agentName} (${agentInfo.specialty}). פרויקט: "${pipelineProject}". שלב: ${stage.name}.\nתן תוצאה קצרה ומעשית לשלב זה.`,"").catch(()=>"שגיאה");
-      results.push({agent:agentName,result:r});
-      await new Promise(r=>setTimeout(r,200));
-    }
-    setPipeResults((prev:any)=>({...prev,[stageIdx]:results}));
-    const combined=results.map(r=>`${r.agent}: ${r.result}`).join("\n\n");
-    await addKnow({id:Date.now(),type:"ידע טכני",title:`${stage.icon} ${stage.name} — ${pipelineProject}`,content:combined.substring(0,500),project:pipelineProject,tags:[stage.id],date:new Date().toISOString().split("T")[0]});
+    try {
+      const res=await fetch('/api/pipeline/run',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({project_id:1,stage:stage.id,project_name:pipelineProject,project_description:pipelineProject})});
+      const data=await res.json();
+      if(data.success){
+        setPipeResults((prev:any)=>({...prev,[stageIdx]:[{agent:'Claude AI',result:data.result}]}));
+        await addKnow({id:Date.now(),type:'pipeline',title:stage.icon+' '+stage.name+' - '+pipelineProject,content:data.result.substring(0,500),project:pipelineProject,tags:[stage.id],date:new Date().toISOString().split('T')[0]});
+      }
+    } catch(e){ console.error('pipeline error',e); }
     setPipeRunning(null);
   };
 
