@@ -1,3 +1,5 @@
+import { readFileSync } from "fs";
+try { const env = readFileSync(".env","utf8").split("\n"); env.forEach(l => { const [k,...v]=l.split("="); if(kv.length) process.env[k.trim()]=v.join("=").trim(); }); } catch(e) {}
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
